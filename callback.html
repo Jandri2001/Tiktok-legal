@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Nada sale del navegador: sin peticiones de red, sin scripts externos, sin referrer -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>TikTok Uploader · Autorización</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #16181d; --muted: #5d6370;
+    --border: #dfe2e8; --accent: #fe2c55; --accent-text: #ffffff;
+    --ok: #12805c; --err: #c62828; --code-bg: #f0f2f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101114; --card: #1a1c21; --text: #eceef2; --muted: #9aa0ab;
+      --border: #2c2f36; --code-bg: #24272d; --ok: #3ccf95; --err: #ff6b6b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.5;
+  }
+  main {
+    width: 100%; max-width: 640px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 32px 28px; box-shadow: 0 8px 30px rgba(0,0,0,.06);
+  }
+  h1 { font-size: 1.5rem; margin: 0 0 8px; }
+  p { margin: 0 0 16px; color: var(--muted); }
+  .estado-ok { color: var(--ok); }
+  .estado-err { color: var(--err); }
+  .codigo {
+    display: block; width: 100%; margin: 8px 0 16px; padding: 18px; resize: none;
+    font: 600 1.35rem/1.4 ui-monospace, "Cascadia Mono", Consolas, monospace;
+    color: var(--text); background: var(--code-bg); border: 2px dashed var(--border);
+    border-radius: 12px; word-break: break-all; user-select: all; -webkit-user-select: all;
+  }
+  button {
+    font: inherit; font-weight: 600; font-size: 1.05rem; padding: 12px 22px; border: 0;
+    border-radius: 10px; background: var(--accent); color: var(--accent-text); cursor: pointer;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+  .aviso-copia { margin-left: 12px; font-weight: 600; color: var(--ok); }
+  .detalle { margin-top: 24px; font-size: .9rem; }
+  .detalle code { background: var(--code-bg); padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+  ol { color: var(--muted); padding-left: 20px; margin: 0 0 16px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <!-- Código recibido -->
+  <section id="vista-ok" hidden>
+    <h1 class="estado-ok">✔ Autorización recibida</h1>
+    <p>Copia este código y pégalo en la consola donde se está ejecutando el script.</p>
+    <label for="codigo"><strong>Código de autorización</strong></label>
+    <textarea id="codigo" class="codigo" rows="3" readonly></textarea>
+    <button id="copiar" type="button">Copiar código</button>
+    <span id="copiado" class="aviso-copia" role="status" aria-live="polite"></span>
+    <p class="detalle">
+      El botón copia el código junto con el parámetro de seguridad <em>state</em>,
+      para que el script compruebe que la respuesta es suya.<br>
+      state: <code id="state">—</code>
+    </p>
+    <p class="detalle">Este código no se envía a ningún servidor: solo está en tu navegador. Caduca en unos minutos.</p>
+  </section>
+
+  <!-- TikTok devolvió un error -->
+  <section id="vista-error" hidden>
+    <h1 class="estado-err">✖ Autorización cancelada o rechazada</h1>
+    <p>TikTok ha devuelto un error:</p>
+    <p class="detalle"><code id="error-codigo"></code></p>
+    <p id="error-desc"></p>
+    <p>Vuelve a la consola y ejecuta de nuevo <code>python main.py --login</code>.</p>
+  </section>
+
+  <!-- Sin parámetros -->
+  <section id="vista-vacia" hidden>
+    <h1>No hay ningún código en esta dirección</h1>
+    <p>Esta página solo muestra el código cuando TikTok te redirige aquí después de autorizar la app.</p>
+    <ol>
+      <li>Ejecuta <code>python main.py --login</code> en la consola.</li>
+      <li>Inicia sesión en TikTok y pulsa <strong>Autorizar</strong>.</li>
+      <li>TikTok te traerá de vuelta a esta página con el código.</li>
+    </ol>
+  </section>
+</main>
+
+<script>
+  (function () {
+    var p = new URLSearchParams(window.location.search);
+    var code = p.get("code");
+    var state = p.get("state") || "";
+    var err = p.get("error");
+
+    if (err) {
+      document.getElementById("error-codigo").textContent = err;
+      document.getElementById("error-desc").textContent = p.get("error_description") || "";
+      document.getElementById("vista-error").hidden = false;
+      return;
+    }
+    if (!code) {
+      document.getElementById("vista-vacia").hidden = false;
+      return;
+    }
+
+    var caja = document.getElementById("codigo");
+    caja.value = code;
+    document.getElementById("state").textContent = state || "(no recibido)";
+    document.getElementById("vista-ok").hidden = false;
+
+    // Lo que se copia: code=...&state=... (el script lo entiende tal cual)
+    var copia = new URLSearchParams({ code: code, state: state }).toString();
+    var aviso = document.getElementById("copiado");
+
+    function seleccionar() { caja.focus(); caja.select(); }
+    caja.addEventListener("focus", seleccionar);
+    caja.addEventListener("click", seleccionar);
+
+    document.getElementById("copiar").addEventListener("click", function () {
+      function hecho() { aviso.textContent = "¡Copiado!"; setTimeout(function () { aviso.textContent = ""; }, 2500); }
+      function fallo() { seleccionar(); aviso.textContent = "Selecciónalo y pulsa Ctrl+C"; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(copia).then(hecho, fallo);
+      } else {
+        fallo();
+      }
+    });
+  })();
+</script>
+</body>
+</html>
